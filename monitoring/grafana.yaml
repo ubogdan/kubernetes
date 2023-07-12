@@ -1,0 +1,135 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: monitoring
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - env: []
+          image: grafana/grafana:9.5.3
+          name: grafana
+          ports:
+            - containerPort: 3000
+              name: http
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+          resources:
+            limits:
+              cpu: 200m
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+            readOnlyRootFilesystem: true
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+          - mountPath: /var/lib/grafana
+            name: grafana-storage
+            readOnly: false
+      nodeSelector:
+        kubernetes.io/os: linux
+      securityContext:
+        fsGroup: 65534
+        runAsNonRoot: true
+        runAsUser: 65534
+      volumes:
+        - name: grafana-storage
+          persistentVolumeClaim:
+            claimName: grafana-data
+
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: grafana-data
+  namespace: monitoring
+  labels:
+    type: nfs
+    app: grafana
+spec:
+  storageClassName: managed-nfs
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteMany
+  nfs:
+    server: 10.0.0.4
+    path: "/mnt/nfs/grafana"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: grafana-data
+  namespace: monitoring
+  labels:
+    app: grafana
+spec:
+  storageClassName: managed-nfs
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 500Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+  namespace: monitoring
+  labels:
+    app: grafana
+spec:
+  ports:
+    - port: 80
+      protocol: TCP
+      targetPort: 3000
+  selector:
+    app: grafana
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    cert-manager.io/cluster-issuer: "letsencrypt"
+  #    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+  name: grafana-ingress
+  namespace: monitoring
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: grafana.ubogdan.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana-service
+                port:
+                  number: 80
+  tls:
+  - hosts:
+    - grafana.ubogdan.com
+    secretName: grafana.ubogdan.com.cert
