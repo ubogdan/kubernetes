@@ -44,7 +44,7 @@ spec:
               type: RuntimeDefault
           volumeMounts:
           - mountPath: /var/lib/grafana
-            name: grafana-storage
+            name: grafana-storage-volume
             readOnly: false
       nodeSelector:
         kubernetes.io/os: linux
@@ -53,17 +53,18 @@ spec:
         runAsNonRoot: true
         runAsUser: 65534
       volumes:
-        - name: grafana-storage
+        - name: grafana-storage-volume
           persistentVolumeClaim:
-            claimName: grafana-data
+            claimName: grafana-storage-volume
 ---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: grafana-data
+  name: grafana-storage-volume
   namespace: monitoring
   labels:
     app: grafana
+    component: server
 spec:
   storageClassName: local-storage
   capacity:
@@ -87,10 +88,11 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: grafana-data
+  name: grafana-storage-volume
   namespace: monitoring
   labels:
     app: grafana
+    component: server
 spec:
   storageClassName: local-storage
   accessModes:
@@ -102,7 +104,7 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: grafana-service
+  name: grafana
   namespace: monitoring
   labels:
     app: grafana
@@ -134,7 +136,7 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: grafana-service
+                name: grafana
                 port:
                   number: 80
   tls:

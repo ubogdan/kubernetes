@@ -173,7 +173,7 @@ data:
           - targets: ['localhost:9090']
       - job_name: 'grafana'
         static_configs:
-          - targets: ['grafana-service']
+          - targets: ['grafana']
       - job_name: 'node-exporter'
         kubernetes_sd_configs:
           - role: endpoints
