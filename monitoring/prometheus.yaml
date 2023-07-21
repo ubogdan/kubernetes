@@ -5,6 +5,7 @@ metadata:
   namespace: monitoring
   labels:
     app: prometheus
+    component: server
 spec:
   replicas: 1
   strategy:
@@ -15,15 +16,17 @@ spec:
   selector:
     matchLabels:
       app: prometheus
+      component: server
   template:
     metadata:
       labels:
         app: prometheus
+        component: server
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9090"
     spec:
-      serviceAccountName: prometheus
+      serviceAccountName: prometheus-service-account
       containers:
         - name: prometheus
           image: prom/prometheus:v2.45.0
@@ -44,19 +47,19 @@ spec:
         - name: prometheus-config-volume
           configMap:
             defaultMode: 420
-            name: prometheus-config
+            name: prometheus-config-volume
         - name: prometheus-storage-volume
           persistentVolumeClaim:
-              claimName: prometheus-data
+              claimName: prometheus-storage-volume
 ---
 apiVersion: v1
 kind: PersistentVolume
 metadata:
-  name: prometheus-data
+  name: prometheus-storage-volume
   namespace: monitoring
   labels:
-    type: nfs
     app: prometheus
+    component: server
 spec:
   storageClassName: local-storage
   capacity:
@@ -80,10 +83,11 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: prometheus-data
+  name: prometheus-storage-volume
   namespace: monitoring
   labels:
     app: prometheus
+    component: server
 spec:
   storageClassName: local-storage
   accessModes:
@@ -95,7 +99,7 @@ spec:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: prometheus
+  name: prometheus-cluster-role
 rules:
 - apiGroups: [""]
   resources:
@@ -116,30 +120,31 @@ rules:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: prometheus
+  name: prometheus-service-account
   namespace: monitoring
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: prometheus
+  name: prometheus-rbac
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: prometheus
+  name: prometheus-cluster-role
 subjects:
 - kind: ServiceAccount
-  name: prometheus
+  name: prometheus-service-account
   namespace: monitoring
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: prometheus-service
+  name: prometheus
   namespace: monitoring
 spec:
   selector:
     app: prometheus
+    component: server
   type: ClusterIP
   ports:
     - port: 9090
@@ -149,7 +154,7 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: prometheus-config
+  name: prometheus-config-volume
   namespace: monitoring
 data:
   prometheus.yml: |
